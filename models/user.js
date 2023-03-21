@@ -58,6 +58,28 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
   },
+
+  verified: {
+    type: Boolean,
+    default: false,
+  },
+
+  otp: {
+    type: String,
+  },
+
+  otpExpiryTime: {
+    type: Date,
+  },
+});
+
+userSchema.pre('save', async function (next) {
+  // Hash the otp only if it is modified
+  if (!this.isModified('otp')) return next();
+
+  this.otp = await bcrypt.hash(this.otp, 12);
+
+  next();
 });
 
 userSchema.methods.correctPassword = async function (
@@ -65,6 +87,10 @@ userSchema.methods.correctPassword = async function (
   userPassword
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+userSchema.methods.correctOtp = async function (candidateOtp, userOtp) {
+  return await bcrypt.compare(candidateOtp, userOtp);
 };
 
 const User = new mongoose.model('User', userSchema);
