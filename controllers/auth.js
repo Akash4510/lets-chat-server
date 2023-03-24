@@ -191,7 +191,7 @@ exports.protect = async (req, res, next) => {
   next();
 };
 
-exports.fogrgotPassword = async (req, res, next) => {
+exports.forgotPassword = async (req, res, next) => {
   const user = await User.findOne({ email: req.body.email });
 
   if (!user) {
