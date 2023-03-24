@@ -187,7 +187,7 @@ exports.protect = async (req, res, next) => {
     });
   }
 
-  req.user = this_user;
+  req.user = freshUser;
   next();
 };
 
