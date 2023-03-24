@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const cors = require('cors');
+const routes = require('./routes');
 
 const app = express();
 
@@ -36,6 +37,8 @@ const limiter = rateLimit({
 app.use('/talk', limiter);
 app.use(mongoSanitize());
 app.use(xss());
+
+app.use(routes);
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
