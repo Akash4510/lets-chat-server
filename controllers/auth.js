@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const otpGenerator = require('otp-generator');
 const crypto = require('crypto');
+const mailService = require('../services/mailer');
 
 const User = require('../models/user');
 const filterObject = require('../utils/filterObject');
@@ -73,6 +74,19 @@ exports.sendOtp = async (req, res, next) => {
   });
 
   // TODO: Sending the otp to the user's email
+  mailService
+    .sendEmail({
+      from: process.env.SENDGRID_EMAIL,
+      to: 'test.email.cr7@gmail.com',
+      subject: "OTP for Let's Chat",
+      text: `Your OTP for Let's Chat is ${newOtp}. This is valid for 10 mins`,
+    })
+    .then(() => {
+      console.log('Email sent successfully');
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 
   res.status(200).json({
     status: 'success',
