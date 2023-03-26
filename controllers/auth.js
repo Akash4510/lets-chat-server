@@ -7,13 +7,16 @@ const User = require('../models/user');
 const filterObject = require('../utils/filterObject');
 const { promisify } = require('util');
 
+// Generating a new JWT token
 const signToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET);
 };
 
+// Registering a new user
 exports.register = async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body;
 
+  // Filtering the request body to only include the required fields
   const filteredBody = filterObject(
     req.body,
     'firstName',
@@ -22,6 +25,7 @@ exports.register = async (req, res, next) => {
     'password'
   );
 
+  // Checking if all required fields are present
   if (!firstName || !lastName || !email || !password) {
     return res.status(400).json({
       status: 'fail',
@@ -29,38 +33,48 @@ exports.register = async (req, res, next) => {
     });
   }
 
+  // Checking if the user already exists
   const existingUser = await User.findOne({ email: email });
 
   if (existingUser && existingUser.verified) {
+    // If the user already exists and is verified, return an error
     return res.status(400).json({
       status: 'fail',
       message: 'User with this email already exists!',
     });
   } else if (existingUser && !existingUser.verified) {
+    // If the user already exists but is not verified, update the user document
     await User.findOneAndUpdate({ email: email }, filteredBody, {
       new: true,
       validateModifyOnly: true,
-      runValidators: true,
     });
 
+    // Setting the userId in the request object
     req.userId = existingUser._id;
+
+    // Calling the next middleware
     next();
   } else {
+    // If the user does not exist, create a new user document
     const newUser = await User.create(filteredBody);
 
+    // Setting the userId in the request object
     req.userId = newUser._id;
+
+    // Calling the next middleware
     next();
   }
 };
 
+// Sending the otp to the user's email
 exports.sendOtp = async (req, res, next) => {
-  const { userId } = req.body;
+  const { userId } = req;
 
   // Generating a new otp
   const newOtp = otpGenerator.generate(6, {
-    upperCase: false,
+    upperCaseAlphabets: false,
     specialChars: false,
-    alphabets: false,
+    lowerCaseAlphabets: false,
   });
 
   // Setting the expiry time for the otp
@@ -68,10 +82,13 @@ exports.sendOtp = async (req, res, next) => {
   const otpEntryTime = Date.now() + otpExpireMins * 60 * 1000;
 
   // Updating the user document with the new otp and expiry time
-  await User.findByIdAndUpdate(userId, {
-    otp: newOtp,
+  const user = await User.findByIdAndUpdate(userId, {
     otpExpiryTime: otpEntryTime,
   });
+
+  // Converting the otp to string and saving it in the user document
+  user.otp = newOtp.toString();
+  await user.save({ new: true, validateModifiedOnly: true });
 
   // TODO: Sending the otp to the user's email
   mailService
@@ -94,6 +111,7 @@ exports.sendOtp = async (req, res, next) => {
   });
 };
 
+// Verifying the otp entered by the user
 exports.verifyOtp = async (req, res, next) => {
   const { email, otp } = req.body;
 
@@ -102,26 +120,38 @@ exports.verifyOtp = async (req, res, next) => {
     otpExpiryTime: { $gt: Date.now() },
   });
 
+  // Checking if the user exists and the otp is valid
   if (!user) {
     return res.status(400).json({
       status: 'fail',
-      message: 'User not found',
+      message: 'User not found or OTP expired',
     });
   }
 
+  // Checking if the user is already verified
+  if (user.verified) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Email is already verified',
+    });
+  }
+
+  // Checking if the otp entered by the user is correct
   if (!(await user.correctOtp(otp, user.otp))) {
-    res.status(400).json({
+    return res.status(400).json({
       status: 'fail',
       message: 'The OTP you entered is incorrect',
     });
   }
 
+  // Updating the user document
   user.verified = true;
   user.otp = undefined;
   user.otpExpiryTime = undefined;
 
   await user.save({ new: true, validateModifyOnly: true, runValidators: true });
 
+  // Generating a new JWT token
   const token = signToken(user._id);
 
   res.status(200).json({
@@ -131,10 +161,11 @@ exports.verifyOtp = async (req, res, next) => {
   });
 };
 
+// Logging in the user
 exports.login = async (req, res, next) => {
   const { email, password } = req.body;
 
-  // 1) Check if email and password exist
+  // Check if email and password exist
   if (!email || !password) {
     return res.status(400).json({
       status: 'fail',
@@ -142,17 +173,34 @@ exports.login = async (req, res, next) => {
     });
   }
 
-  // 2) Check if user exists && password is correct
+  // Find user by email and password
   const user = await User.findOne({ email: email }).select('+password');
 
-  if (!user || !(await user.correctPassword(password, user.password))) {
-    return res.status(401).json({
+  // Check if user exists
+  if (!user) {
+    return res.status(400).json({
       status: 'fail',
-      message: 'Incorrect email or password',
+      message: 'User does not exist',
     });
   }
 
-  // 3) If everything ok, send token to client
+  // Check if user is verified
+  if (!user.verified) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Please verify your email first',
+    });
+  }
+
+  // Check if user is verified
+  if (!(await user.correctPassword(password, user.password))) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'Incorrect password',
+    });
+  }
+
+  // If everything ok, send token to client
   const token = signToken();
 
   res.status(200).json({
@@ -162,8 +210,9 @@ exports.login = async (req, res, next) => {
   });
 };
 
+// Protecting the routes from unauthorized access
 exports.protect = async (req, res, next) => {
-  // 1) Getting token and check of it's there
+  // Getting token and check of it's there
   let token;
 
   if (
@@ -180,12 +229,13 @@ exports.protect = async (req, res, next) => {
     });
   }
 
-  // 2) Verification token
+  // Verify the token
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
-  // 3) Check if user still exists
+  // Check if user still exists (It may happen that the user is deleted after the token is issued)
   const freshUser = await User.findById(decoded.id);
 
+  // If the user is deleted, then throw an error
   if (!freshUser) {
     return res.status(401).json({
       status: 'fail',
@@ -193,7 +243,7 @@ exports.protect = async (req, res, next) => {
     });
   }
 
-  // 4) Check if user changed password after the token was issued
+  // Check if user changed password after the token was issued
   if (freshUser.changedPasswordAfter(decoded.iat)) {
     return res.status(401).json({
       status: 'fail',
@@ -201,13 +251,19 @@ exports.protect = async (req, res, next) => {
     });
   }
 
+  // Store the user in the request object
   req.user = freshUser;
+
+  // Call the next middleware
   next();
 };
 
+// Forgot password
 exports.forgotPassword = async (req, res, next) => {
+  // Get user based on the posted email
   const user = await User.findOne({ email: req.body.email });
 
+  // If user does not exist, then throw an error
   if (!user) {
     return res.status(404).json({
       status: 'fail',
@@ -215,17 +271,24 @@ exports.forgotPassword = async (req, res, next) => {
     });
   }
 
+  // Generate the random reset token and save it in the user's document
   const resetToken = user.createPasswordResetToken();
-  const resetURL = `${req.protocol}://${req.get(
-    'host'
-  )}/auth/reset-password/?code=${resetToken}`;
+  await user.save({ validateBeforeSave: false });
 
+  // Send the reset token to the user's email
   try {
+    const resetURL = `${req.protocol}://${req.get(
+      'host'
+    )}/auth/reset-password/?code=${resetToken}`;
+
+    console.log(resetURL);
+
     res.status(200).json({
       status: 'success',
       message: 'Token sent to email!',
     });
   } catch (err) {
+    // If there is an error, then reset the passwordResetToken and passwordResetExpires fields
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
@@ -237,11 +300,12 @@ exports.forgotPassword = async (req, res, next) => {
   }
 };
 
+// Resetting the password
 exports.resetPassword = async (req, res, next) => {
-  // 1) Get user based on the token
+  // Get user based on the token
   const hashedToken = crypto
     .createHash('sha256')
-    .update(req.params.token)
+    .update(req.body.token)
     .digest('hex');
 
   const user = await User.findOne({
@@ -249,7 +313,7 @@ exports.resetPassword = async (req, res, next) => {
     passwordResetExpires: { $gt: Date.now() },
   });
 
-  // 2) If token has not expired, and there is user, set the new password
+  // If token has not expired, and there is user, set the new password
   if (!user) {
     return res.status(400).json({
       status: 'fail',
@@ -257,17 +321,17 @@ exports.resetPassword = async (req, res, next) => {
     });
   }
 
+  // Set the new password and save it in the user's document
   user.password = req.body.password;
   user.passwordConfirm = req.body.passwordConfirm;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
 
+  // Update changedPasswordAt property for the user
+  user.passwordChangedAt = Date.now() - 1000;
   await user.save();
 
-  // 3) Update changedPasswordAt property for the user
-  user.passwordChangedAt = Date.now() - 1000;
-
-  // 4) Log the user in, send JWT
+  // Log the user in, send JWT
   const token = signToken(user._id);
 
   res.status(200).json({
