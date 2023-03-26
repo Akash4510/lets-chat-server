@@ -1,4 +1,5 @@
 const User = require('../models/user');
+const filterObject = require('../utils/filterObject');
 
 exports.updateMe = async function (req, res, next) {
   const { user } = req;

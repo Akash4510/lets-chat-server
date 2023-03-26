@@ -1,6 +1,6 @@
 const router = require('express').Router();
-const authController = require('../controllers/auth');
-const userController = require('../controllers/user');
+const authController = require('../controllers/authController');
+const userController = require('../controllers/userController');
 
 router.patch('/update-me', authController.protect, userController.updateMe);
 
