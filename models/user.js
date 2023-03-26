@@ -26,7 +26,9 @@ const userSchema = new mongoose.Schema({
       validator: function (val) {
         return String(val)
           .toLowerCase()
-          .match(/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/);
+          .match(
+            /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+          );
       },
       message: (props) => `${props.value} is not a valid email address!`,
     },
@@ -37,17 +39,6 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Please provide a password'],
     minlength: 8,
     select: false,
-  },
-
-  passwordConfirm: {
-    type: String,
-    required: [true, 'Please confirm your password'],
-    validate: {
-      validator: function (val) {
-        return val === this.password;
-      },
-      message: 'Passwords are not the same!',
-    },
   },
 
   passwordChangedAt: {
@@ -87,19 +78,28 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function (next) {
   // Hash the otp only if it is modified
-  if (!this.isModified('otp')) return next();
+  if (!this.isModified('otp') || !this.otp) return next();
 
-  this.otp = await bcrypt.hash(this.otp, 12);
+  this.otp = await bcrypt.hash(this.otp.toString(), 12);
+  console.log(this.otp.toString(), 'FROM PRE SAVE HOOK');
 
   next();
 });
 
 userSchema.pre('save', async function (next) {
   // Hash the password only if it is modified
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
 
   this.password = await bcrypt.hash(this.password, 12);
 
+  next();
+});
+
+userSchema.pre('save', function (next) {
+  if (!this.isModified('password') || this.isNew || !this.password)
+    return next();
+
+  this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
