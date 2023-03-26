@@ -7,3 +7,5 @@ const filterObject = (obj, ...allowedFields) => {
   });
   return newObj;
 };
+
+module.exports = filterObject;
