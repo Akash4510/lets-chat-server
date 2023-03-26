@@ -36,6 +36,5 @@ exports.sendEmail = async (args) => {
     return new Promise.resolve();
   } else {
     console.log(args);
-    console.log('Email Sent Sucessfully');
   }
 };
