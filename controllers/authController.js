@@ -112,7 +112,7 @@ exports.sendOtp = async (req, res, next) => {
 };
 
 // Verifying the otp entered by the user
-exports.verifyOtp = async (req, res, next) => {
+exports.verifyEmail = async (req, res, next) => {
   const { email, otp } = req.body;
 
   const user = await User.findOne({
@@ -277,9 +277,7 @@ exports.forgotPassword = async (req, res, next) => {
 
   // Send the reset token to the user's email
   try {
-    const resetURL = `${req.protocol}://${req.get(
-      'host'
-    )}/auth/reset-password/?code=${resetToken}`;
+    const resetURL = `http://loaclhost:3000/auth/reset-password?token=${resetToken}`;
 
     console.log(resetURL);
 
