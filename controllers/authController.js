@@ -6,6 +6,7 @@ const mailService = require('../services/mailer');
 const User = require('../models/user');
 const filterObject = require('../utils/filterObject');
 const { promisify } = require('util');
+const AppError = require('../utils/AppError');
 
 // Generating a new JWT token
 const signToken = (userId) => {
@@ -94,7 +95,7 @@ exports.sendOtp = async (req, res, next) => {
   mailService
     .sendEmail({
       from: process.env.SENDGRID_EMAIL,
-      to: 'test.email.cr7@gmail.com',
+      to: user.email,
       subject: "OTP for Let's Chat",
       text: `Your OTP for Let's Chat is ${newOtp}. This is valid for 10 mins`,
     })
@@ -224,11 +225,12 @@ exports.protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   } else if (req.cookies.jwt) {
     token = req.cookies.jwt;
-  } else {
-    return res.status(401).json({
-      status: 'fail',
-      message: 'You are not logged in! Please log in to get access.',
-    });
+  }
+
+  if (!token) {
+    return next(
+      new AppError('You are not logged in! Please log in to get access.', 401)
+    );
   }
 
   // Verify the token
@@ -239,18 +241,19 @@ exports.protect = async (req, res, next) => {
 
   // If the user is deleted, then throw an error
   if (!freshUser) {
-    return res.status(401).json({
-      status: 'fail',
-      message: 'The user belonging to this token does no longer exist.',
-    });
+    return next(
+      new AppError(
+        'The user belonging to this token does no longer exist.',
+        401
+      )
+    );
   }
 
   // Check if user changed password after the token was issued
   if (freshUser.changedPasswordAfter(decoded.iat)) {
-    return res.status(401).json({
-      status: 'fail',
-      message: 'User recently changed password! Please log in again.',
-    });
+    return next(
+      new AppError('User recently changed password! Please log in again.', 401)
+    );
   }
 
   // Store the user in the request object
@@ -293,10 +296,12 @@ exports.forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
-    return res.status(500).json({
-      status: 'fail',
-      message: 'There was an error sending the email. Try again later!',
-    });
+    return next(
+      new AppError(
+        'There was an error sending the email. Try again later!',
+        500
+      )
+    );
   }
 };
 
