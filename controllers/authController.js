@@ -158,6 +158,7 @@ exports.verifyEmail = async (req, res, next) => {
     status: 'success',
     message: 'User verified successfully',
     token,
+    userId: user._id,
   });
 };
 
@@ -201,12 +202,13 @@ exports.login = async (req, res, next) => {
   }
 
   // If everything ok, send token to client
-  const token = signToken();
+  const token = signToken(user._id);
 
   res.status(200).json({
     status: 'success',
     message: 'Logged in successfully',
     token,
+    userId: user._id,
   });
 };
 
