@@ -85,6 +85,11 @@ const userSchema = new mongoose.Schema({
       ref: 'User',
     },
   ],
+
+  status: {
+    type: String,
+    enum: ['online', 'offline'],
+  },
 });
 
 userSchema.pre('save', async function (next) {
@@ -125,6 +130,19 @@ userSchema.methods.correctOtp = async function (candidateOtp, userOtp) {
   return await bcrypt.compare(candidateOtp, userOtp);
 };
 
+userSchema.methods.changedPasswordAfter = function (JWTTimeStamp) {
+  if (this.passwordChangedAt) {
+    const changedTimeStamp = parseInt(
+      this.passwordChangedAt.getTime() / 1000,
+      10
+    );
+    return JWTTimeStamp < changedTimeStamp;
+  }
+
+  // FALSE MEANS NOT CHANGED
+  return false;
+};
+
 userSchema.methods.createPasswordResetToken = function () {
   const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -135,10 +153,6 @@ userSchema.methods.createPasswordResetToken = function () {
 
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
   return resetToken;
-};
-
-userSchema.methods.changePassword = function (timestamp) {
-  return timestamp < this.passwordChangedAt;
 };
 
 const User = new mongoose.model('User', userSchema);

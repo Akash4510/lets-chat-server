@@ -1,8 +1,21 @@
 const User = require('../models/user');
 const FriendRequest = require('../models/friendRequest');
 const filterObject = require('../utils/filterObject');
+const catchAsync = require('../utils/catchAsync');
 
-exports.updateMe = async function (req, res, next) {
+// const { generateToken04 } = require('./zegoServerAssistant');
+
+// const appID = process.env.ZEGO_APP_ID;
+// const serverSecret = process.env.ZEGO_SERVER_SECRET;
+
+exports.getMe = catchAsync(async (req, res, next) => {
+  res.status(200).json({
+    status: 'success',
+    data: req.user,
+  });
+});
+
+exports.updateMe = catchAsync(async (req, res, next) => {
   const { user } = req;
 
   const filteredBody = filterObject(
@@ -23,9 +36,9 @@ exports.updateMe = async function (req, res, next) {
     data: updatedUser,
     message: 'Profile updated successfully!',
   });
-};
+});
 
-exports.getUsers = async function (req, res, next) {
+exports.getUsers = catchAsync(async (req, res, next) => {
   const allUsers = await User.find({
     verified: true,
   }).select('firstName lastName _id');
@@ -43,9 +56,25 @@ exports.getUsers = async function (req, res, next) {
     data: remainingUsers,
     message: 'All users fetched successfully!',
   });
-};
+});
 
-exports.getRequests = async function (req, res, next) {
+exports.getAllVerifiedUsers = catchAsync(async (req, res, next) => {
+  const allUsers = await User.find({
+    verified: true,
+  }).select('firstName lastName _id');
+
+  const remainingUsers = allUsers.filter(
+    (user) => user._id.toString() !== req.user._id.toString()
+  );
+
+  res.status(200).json({
+    status: 'success',
+    data: remainingUsers,
+    message: 'Users found successfully!',
+  });
+});
+
+exports.getRequests = catchAsync(async (req, res, next) => {
   const requests = await FriendRequest.find({
     reciever: req.user._id,
   }).populate('sender', '_id firstName lastName');
@@ -55,9 +84,9 @@ exports.getRequests = async function (req, res, next) {
     data: requests,
     message: 'All requests fetched successfully!',
   });
-};
+});
 
-exports.getFriends = async function (req, res, next) {
+exports.getFriends = catchAsync(async (req, res, next) => {
   const thisUser = await User.findById(req.user._id).populate(
     'friends',
     '_id firstName lastName'
@@ -68,4 +97,4 @@ exports.getFriends = async function (req, res, next) {
     data: thisUser.friends,
     message: 'All friends fetched successfully!',
   });
-};
+});

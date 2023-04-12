@@ -7,6 +7,8 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const cors = require('cors');
 const routes = require('./routes');
+const cookieParser = require('cookie-parser');
+const session = require('cookie-session');
 
 const app = express();
 
@@ -21,7 +23,18 @@ app.use(
     credentials: true,
   })
 );
-
+app.use(cookieParser());
+app.use(
+  session({
+    secret: 'keyboard cat',
+    proxy: true,
+    resave: true,
+    saveUnintialized: true,
+    cookie: {
+      secure: false,
+    },
+  })
+);
 app.use(helmet());
 
 if (process.env.NODE_ENV === 'development') {
@@ -39,9 +52,5 @@ app.use(mongoSanitize());
 app.use(xss());
 
 app.use(routes);
-
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
 
 module.exports = app;
