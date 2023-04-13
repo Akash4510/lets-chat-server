@@ -76,7 +76,7 @@ exports.getAllVerifiedUsers = catchAsync(async (req, res, next) => {
 
 exports.getRequests = catchAsync(async (req, res, next) => {
   const requests = await FriendRequest.find({
-    reciever: req.user._id,
+    receiver: req.user._id,
   }).populate('sender', '_id firstName lastName');
 
   res.status(200).json({
