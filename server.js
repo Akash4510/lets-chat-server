@@ -14,7 +14,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5000',
+    origin: '*',
     methods: ['GET', 'POST'],
   },
 });
@@ -64,7 +64,7 @@ io.on('connection', async (socket) => {
 
   if (userId !== null && Boolean(userId)) {
     try {
-      await User.findIdAndUpdate(userId, { socketId, status: 'online' });
+      await User.findByIdAndUpdate(userId, { socketId, status: 'online' });
     } catch (e) {
       console.log(e);
     }
@@ -202,7 +202,7 @@ io.on('connection', async (socket) => {
 
   socket.on('end', async (data) => {
     if (data.userId) {
-      await User.findIdAndUpdate(data.userId, {
+      await User.findByIdAndUpdate(data.userId, {
         socketId: null,
         status: 'offline',
       });
