@@ -294,7 +294,7 @@ exports.forgotPassword = async (req, res, next) => {
 
   // Send the reset token to the user's email
   try {
-    const resetURL = `http://loaclhost:3000/auth/reset-password?token=${resetToken}`;
+    const resetURL = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
 
     console.log(resetURL);
 
