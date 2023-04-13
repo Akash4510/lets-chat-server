@@ -160,6 +160,12 @@ exports.verifyEmail = async (req, res, next) => {
     message: 'User verified successfully',
     token,
     userId: user._id,
+    user: {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    },
   });
 };
 
@@ -210,6 +216,12 @@ exports.login = async (req, res, next) => {
     message: 'Logged in successfully',
     token,
     userId: user._id,
+    user: {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    },
   });
 };
 
