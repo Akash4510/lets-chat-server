@@ -56,7 +56,6 @@ server.listen(port, () => {
 });
 
 io.on('connection', async (socket) => {
-  console.log(JSON.stringify(socket.handshake.query));
   const userId = socket.handshake.query['userId'];
   const socketId = socket.id;
 
@@ -88,7 +87,7 @@ io.on('connection', async (socket) => {
     });
   });
 
-  socket.on('accept_request', async (data, callback) => {
+  socket.on('accept_friend_request', async (data, callback) => {
     console.log(data);
 
     const requestDoc = await FriendRequest.findById(data.requestId);
@@ -113,12 +112,10 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('get_direct_conversatoins', async ({ userId }, callback) => {
+    console.log('Getting direct conversations for user: ' + userId);
     const existingConversations = await OneToOneMessage.find({
       participants: { $all: [userId] },
-    }).populate({
-      path: 'participants',
-      select: 'firstName lastName _id, email status',
-    });
+    }).populate('participants', 'firstName lastName _id, email status');
 
     console.log(existingConversations);
 
