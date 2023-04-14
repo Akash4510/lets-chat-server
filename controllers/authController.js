@@ -115,6 +115,7 @@ exports.sendOtp = async (req, res, next) => {
 // Verifying the otp entered by the user
 exports.verifyEmail = async (req, res, next) => {
   const { email, otp } = req.body;
+  console.log(email, otp);
 
   const user = await User.findOne({
     email: email,
