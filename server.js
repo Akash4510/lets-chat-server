@@ -21,14 +21,14 @@ const io = new Server(server, {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.log(err.name, err.message);
+  console.log(err);
   console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
   process.exit(1);
 });
 
 // Terminate the process if an unhandled rejection occurs
 process.on('unhandledRejection', (err) => {
-  console.log(err.name, err.message);
+  console.log(err);
   console.log('UNHANDLED REJECTION! 💥 Shutting down...');
   server.close(() => {
     process.exit(1);
@@ -57,13 +57,17 @@ server.listen(port, () => {
 
 io.on('connection', async (socket) => {
   const userId = socket.handshake.query['userId'];
-  const socketId = socket.id;
 
-  console.log(`user ${userId} connected`);
+  console.log(
+    `\nuser connected\nUser Id: ${userId}\nSocket Id: ${socket.id}\n`
+  );
 
   if (userId !== null && Boolean(userId)) {
     try {
-      await User.findByIdAndUpdate(userId, { socketId, status: 'online' });
+      await User.findByIdAndUpdate(userId, {
+        socketId: socket.id,
+        status: 'online',
+      });
     } catch (e) {
       console.log(e);
     }
@@ -103,10 +107,11 @@ io.on('connection', async (socket) => {
 
     await FriendRequest.findByIdAndDelete(data.requestId);
 
-    io.to(sender?.socketId).emit('request_accepted', {
+    io.to(sender?.socketId).emit('friend_request_accepted', {
       message: 'Friend request accepted',
     });
-    io.to(receiver?.socketId).emit('request_accepted', {
+
+    io.to(receiver?.socketId).emit('friend_request_accepted', {
       message: 'Friend request accepted',
     });
   });
@@ -124,25 +129,29 @@ io.on('connection', async (socket) => {
 
   socket.on('start_conversation', async (data) => {
     const { to, from } = data;
+
     const existingConversations = await OneToOneMessage.find({
       participants: { $size: 2, $all: [to, from] },
     }).populate('participants', 'firstName lastName _id email status');
 
     console.log(`Existing conversation: ${existingConversations[0]}`);
 
+    // if no => create a new OneToOneMessage doc & emit event "start_chat" & send conversation details as payload
     if (existingConversations.length === 0) {
       let newChat = await OneToOneMessage.create({
         participants: [to, from],
       });
 
-      newChat = await OneToOneMessage.findById(newChat._id).populate(
+      newChat = await OneToOneMessage.findById(newChat).populate(
         'participants',
         'firstName lastName _d email status'
       );
       console.log(newChat);
       socket.emit('start_chat', newChat);
-    } else {
-      socket.emit('open_chat', existingConversations[0]);
+    }
+    // if yes => just emit event "start_chat" & send conversation details as payload
+    else {
+      socket.emit('start_chat', existingConversations[0]);
     }
   });
 
@@ -168,16 +177,16 @@ io.on('connection', async (socket) => {
       text: message,
     };
 
-    const chat = await OneToOneMessage.findByIdAndUpdate(conversationId);
+    const chat = await OneToOneMessage.findById(conversationId);
     chat.messages.push(newMessage);
     await chat.save({ new: true, validateModifiedOnly: true });
 
-    io.to(toUser.socketId).emit('new_message', {
+    io.to(toUser?.socketId).emit('new_message', {
       conversationId,
       message: newMessage,
     });
 
-    io.to(fromUser.socketId).emit('new_message', {
+    io.to(fromUser?.socketId).emit('new_message', {
       conversationId,
       message: newMessage,
     });
@@ -204,7 +213,7 @@ io.on('connection', async (socket) => {
         status: 'offline',
       });
     }
-    console.log('User disconnected');
+    console.log(`\nUser ${data.userId} disconnected\n`);
     socket.disconnect(0);
   });
 });

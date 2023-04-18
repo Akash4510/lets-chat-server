@@ -6,15 +6,13 @@ const mailService = require('../services/mailer');
 const User = require('../models/user');
 const filterObject = require('../utils/filterObject');
 const { promisify } = require('util');
-const AppError = require('../utils/AppError');
+const catchAsync = require('../utils/catchAsync');
 
 // Generating a new JWT token
-const signToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET);
-};
+const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
 
 // Registering a new user
-exports.register = async (req, res, next) => {
+exports.register = catchAsync(async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body;
 
   // Filtering the request body to only include the required fields
@@ -65,10 +63,10 @@ exports.register = async (req, res, next) => {
     // Calling the next middleware
     next();
   }
-};
+});
 
 // Sending the otp to the user's email
-exports.sendOtp = async (req, res, next) => {
+exports.sendOtp = catchAsync(async (req, res, next) => {
   const { userId } = req;
 
   // Generating a new otp
@@ -94,7 +92,7 @@ exports.sendOtp = async (req, res, next) => {
   // TODO: Sending the otp to the user's email
   mailService
     .sendEmail({
-      from: process.env.SENDGRID_EMAIL,
+      from: 'lets@chat.com',
       to: user.email,
       subject: "OTP for Let's Chat",
       text: `Your OTP for Let's Chat is ${newOtp}. This is valid for 10 mins`,
@@ -110,10 +108,10 @@ exports.sendOtp = async (req, res, next) => {
     status: 'success',
     message: 'OTP sent successfully',
   });
-};
+});
 
 // Verifying the otp entered by the user
-exports.verifyEmail = async (req, res, next) => {
+exports.verifyEmail = catchAsync(async (req, res, next) => {
   const { email, otp } = req.body;
   console.log(email, otp);
 
@@ -168,10 +166,10 @@ exports.verifyEmail = async (req, res, next) => {
       email: user.email,
     },
   });
-};
+});
 
 // Logging in the user
-exports.login = async (req, res, next) => {
+exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
   // Check if email and password exist
@@ -224,10 +222,10 @@ exports.login = async (req, res, next) => {
       email: user.email,
     },
   });
-};
+});
 
 // Protecting the routes from unauthorized access
-exports.protect = async (req, res, next) => {
+exports.protect = catchAsync(async (req, res, next) => {
   // Getting token and check of it's there
   let token;
 
@@ -241,43 +239,45 @@ exports.protect = async (req, res, next) => {
   }
 
   if (!token) {
-    return next(
-      new AppError('You are not logged in! Please log in to get access.', 401)
-    );
+    return res.status(401).json({
+      status: 'fail',
+      message: 'You are not logged in! Please log in to get access.',
+    });
   }
 
   // Verify the token
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
+  console.log(decoded);
+
   // Check if user still exists (It may happen that the user is deleted after the token is issued)
-  const freshUser = await User.findById(decoded.id);
+  const thisUser = await User.findById(decoded.userId);
 
   // If the user is deleted, then throw an error
-  if (!freshUser) {
-    return next(
-      new AppError(
-        'The user belonging to this token does no longer exist.',
-        401
-      )
-    );
+  if (!thisUser) {
+    return res.staus(401).json({
+      status: 'fail',
+      message: 'The user belonging to this token does no longer exist.',
+    });
   }
 
   // Check if user changed password after the token was issued
-  if (freshUser.changedPasswordAfter(decoded.iat)) {
-    return next(
-      new AppError('User recently changed password! Please log in again.', 401)
-    );
+  if (thisUser.changedPasswordAfter(decoded.iat)) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'User recently changed password! Please log in again.',
+    });
   }
 
   // Store the user in the request object
-  req.user = freshUser;
+  req.user = thisUser;
 
   // Call the next middleware
   next();
-};
+});
 
 // Forgot password
-exports.forgotPassword = async (req, res, next) => {
+exports.forgotPassword = catchAsync(async (req, res, next) => {
   // Get user based on the posted email
   const user = await User.findOne({ email: req.body.email });
 
@@ -309,17 +309,15 @@ exports.forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
-    return next(
-      new AppError(
-        'There was an error sending the email. Try again later!',
-        500
-      )
-    );
+    return res.status(500).json({
+      status: 'fail',
+      message: 'There was an error sending the email. Try again later!',
+    });
   }
-};
+});
 
 // Resetting the password
-exports.resetPassword = async (req, res, next) => {
+exports.resetPassword = catchAsync(async (req, res, next) => {
   // Get user based on the token
   const hashedToken = crypto
     .createHash('sha256')
@@ -357,4 +355,4 @@ exports.resetPassword = async (req, res, next) => {
     message: 'Password reset successfully',
     token,
   });
-};
+});
