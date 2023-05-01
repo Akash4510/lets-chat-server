@@ -73,7 +73,9 @@ io.on('connection', async (socket) => {
     }
   }
 
-  socket.on('friend_request', async (data, callback) => {
+  socket.on('send_friend_request', async (data, callback) => {
+    console.log(`\nFriend request sent from ${data.from} to ${data.to}\n`);
+
     const toUser = await User.findById(data.to).select('socketId');
     const fromUser = await User.findById(data.from).select('socketId');
 
@@ -92,7 +94,9 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('accept_friend_request', async (data, callback) => {
-    console.log(data);
+    console.log(
+      `\nFriend request from ${data.from} is accepted by ${data.to}\n`
+    );
 
     const requestDoc = await FriendRequest.findById(data.requestId);
 
