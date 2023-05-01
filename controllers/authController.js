@@ -8,6 +8,9 @@ const filterObject = require('../utils/filterObject');
 const { promisify } = require('util');
 const catchAsync = require('../utils/catchAsync');
 
+const otpHTML = require('../Templates/Mail/otp');
+const resetHTML = require('../Templates/Mail/resetPassword');
+
 // Generating a new JWT token
 const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
 
@@ -89,25 +92,28 @@ exports.sendOtp = catchAsync(async (req, res, next) => {
   user.otp = newOtp.toString();
   await user.save({ new: true, validateModifiedOnly: true });
 
-  // TODO: Sending the otp to the user's email
+  console.log(`OTP for ${user.email} is ${newOtp}`);
+
   mailService
     .sendEmail({
-      from: 'lets@chat.com',
       to: user.email,
-      subject: "OTP for Let's Chat",
-      text: `Your OTP for Let's Chat is ${newOtp}. This is valid for 10 mins`,
+      subject: 'OTP for LetsChat',
+      html: otpHTML(user.firstName, newOtp),
     })
     .then(() => {
-      console.log('Email sent successfully');
+      console.log('OTP sent successfully');
+      return res.status(200).json({
+        status: 'success',
+        message: 'OTP sent successfully',
+      });
     })
     .catch((err) => {
       console.log(err);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Something went wrong',
+      });
     });
-
-  res.status(200).json({
-    status: 'success',
-    message: 'OTP sent successfully',
-  });
 });
 
 // Verifying the otp entered by the user
@@ -299,10 +305,26 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
 
     console.log(resetURL);
 
-    res.status(200).json({
-      status: 'success',
-      message: 'Token sent to email!',
-    });
+    mailService
+      .sendEmail({
+        to: user.email,
+        subject: 'Password Reset for LetsChat',
+        html: resetHTML(user.firstName, resetURL),
+      })
+      .then(() => {
+        console.log('Email sent successfully');
+        return res.status(200).json({
+          status: 'success',
+          message: 'Email sent successfully',
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        return res.status(500).json({
+          status: 'error',
+          message: 'Something went wrong',
+        });
+      });
   } catch (err) {
     // If there is an error, then reset the passwordResetToken and passwordResetExpires fields
     user.passwordResetToken = undefined;
